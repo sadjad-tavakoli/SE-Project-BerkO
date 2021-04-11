@@ -2,7 +2,7 @@
 // JALANGI DO NOT INSTRUMENT
 const fs = require('fs');
 const events = require('events')
-
+const { projectDirectoryTests, projectDirectory, getEntityKey } = require('./utils');
 
 let logger = "";
 let mainFileName = "";
@@ -12,9 +12,9 @@ let accessedFiles = new Map();
 let EventEmmiter = events.EventEmitter.prototype;
 let addedListeners = new Map();
 let emittedEvents = new Map();
-let functionIDs = [];
-let dependencies = [];
-const trackExternals = false;
+let entitiesData = {};
+
+const trackExternals = true;
 
 (function (sandbox) {
     sandbox.Config.LOG_ALL_READS_AND_BRANCHES = true
@@ -40,15 +40,15 @@ const trackExternals = false;
                 log(lineNumber + " function " + callerFunction.name + " emitted event " + args[0] + " of " + base.constructor.name)
             } else {
                 if (isTimeOut(f)) {
-                    addToTimeoutMap('t_' + args[0] + Math.max(args[1], 1), {'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber})
+                    addToTimeoutMap('t_' + args[0] + Math.max(args[1], 1), { 'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber })
                     fName += lineNumber + getPositionInLine(iid)
 
                 } else if (isImmediate(f)) {
-                    addToTimeoutMap('i_' + args[0], {'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber})
+                    addToTimeoutMap('i_' + args[0], { 'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber })
                     fName += lineNumber + getPositionInLine(iid)
 
                 } else if (isInterval(f)) {
-                    addToTimeoutMap('v_' + args[0] + args[1], {'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber})
+                    addToTimeoutMap('v_' + args[0] + args[1], { 'caller': functionEnterStack[functionEnterStack.length - 1], 'lineNumber': lineNumber })
                     fName += lineNumber + getPositionInLine(iid)
 
                 } else if (isAnonymousFunction(f)) {
@@ -67,15 +67,14 @@ const trackExternals = false;
                 accessedFiles.set(getFilePath(iid), iid)
             } else {
                 let fName = f.name;
-
                 if (isMainFile(iid)) {
                     mainFileName = fName = getFileName(iid)
                     accessedFiles.set(fName, iid)
-                    functionEnterStack.push({ 'name': fName })
-                    getID({ 'name': fName })
+                    let fInfo = { 'name': fName, 'iid': iid }
+                    functionEnterStack.push(fInfo)
 
                 } else if (f.isConstructor) {
-                    addDependency(f, functionEnterStack[functionEnterStack.length - 1])
+                    addDependency({ 'name': fName, 'object': f, 'iid': iid }, functionEnterStack[functionEnterStack.length - 1])
                     log(getLine(iid) + " class " + fName + "'s constructor entered with variables " + 'args from ' + functionEnterStack[functionEnterStack.length - 1].name)
 
                 } else if (isCalledByEvents(dis)) {
@@ -83,7 +82,7 @@ const trackExternals = false;
                     if (fName == "") fName = 'anonymous' + getLine(iid)
                     f.calledByEvent = true;
                     log(getLine(iid) + " function " + fName + " entered with variables " + 'args' + " throught event " + event.event + " emitted by function " + event.callerFunction.name)
-                    addDependency({ 'name': fName, 'object': f }, functionEnterStack[functionEnterStack.length - 1])
+                    addDependency({ 'name': fName, 'object': f, 'iid': iid }, functionEnterStack[functionEnterStack.length - 1])
 
                 } else {
                     if (isCalledByTimeoutOrInterval(dis)) {
@@ -97,22 +96,24 @@ const trackExternals = false;
                             timeoutFunction = popFromTimeoutMap('t_' + f + dis._idleTimeout)
                             functionEnterStack.push({ 'name': 'setTimeOut' + timeoutFunction.lineNumber, 'isTimer': true })
                         }
-                        addDependency({ 'name': fName, 'object': f }, timeoutFunction.caller)
+                        addDependency({ 'name': fName, 'object': f, 'iid': iid }, timeoutFunction.caller)
 
                     } else if (isCalledByImmediate(dis)) {
                         let timeoutFunction = popFromTimeoutMap('i_' + f)
                         functionEnterStack.push({ 'name': 'setImmediate' + timeoutFunction.lineNumber, 'isTimer': true })
                         if (fName == "") fName = 'anonymous' + getLine(iid)
-                        addDependency({ 'name': fName, 'object': f }, timeoutFunction.caller)
+                        addDependency({ 'name': fName, 'object': f, 'iid': iid }, timeoutFunction.caller)
 
                     } else if (fName == "") {
-                        fName = f.anonymous_name
-                        addDependency({ 'name': fName, 'object': f }, functionEnterStack[functionEnterStack.length - 1])
+                        fName = f.anonymous_name ? f.anonymous_name : 'anonymous' + getLine(iid) + getPositionInLine(iid)
+                        addDependency({ 'name': fName, 'object': f, 'iid': iid }, functionEnterStack[functionEnterStack.length - 1])
 
+                    } else {
+                        addDependency({ 'name': fName, 'object': f, 'iid': iid }, functionEnterStack[functionEnterStack.length - 1])
                     }
                     log(getLine(iid) + " function " + fName + " entered with variables " + 'args from ' + functionEnterStack[functionEnterStack.length - 1].name)
                 }
-                functionEnterStack.push({ 'name': fName, 'object': f })
+                functionEnterStack.push({ 'name': fName, 'object': f, 'iid': iid })
             }
         };
         this.functionExit = function (iid, returnVal, wrappedExceptionVal) {
@@ -144,16 +145,7 @@ const trackExternals = false;
                 }
                 console.log("The file was saved!");
             });
-
-            for(let i in dependencies){
-                for(let j in dependencies[i]){
-                    console.log("function " + functionIDs[i].name + " is called by " + functionIDs[j].name)
-                    // console.log(i)
-                    // console.log(j)
-                    // console.log(dependencies[i])
-                    // console.log(dependencies[i][j])
-                }
-            }
+            updateDependencies()
         };
 
         function getRelatedEvent(base, func) {
@@ -177,24 +169,21 @@ const trackExternals = false;
     }
 
     {
-        function getID(func){
-            let index = functionIDs.indexOf(func);
-            if (index == -1) {
-                functionIDs.push(func)
-                index = functionIDs.length -1
-            }
-            return index
-
-        }
         function getFileName(iid) {
-            return getFilePath(iid).split('/')[2];
+            let directories = getFilePath(iid).split('/')
+            return directories[directories.length - 1];
         }
 
         function getFilePath(iid) {
             return J$.iidToLocation(iid).split(':')[0];
         }
+
         function getLine(iid) {
             return J$.iidToLocation(iid).split(':')[1]
+        }
+
+        function getEndLine(iid) {
+            return J$.iidToLocation(iid).split(':')[3]
         }
 
         function getPositionInLine(iid) {
@@ -238,19 +227,27 @@ const trackExternals = false;
         }
 
         function isCalledByImmediate(base) {
-            return base._onImmediate
+            if (base) return base._onImmediate
+            return undefined
         }
 
         function isCalledByTimeoutOrInterval(base) {
-            return base._onTimeout
+            if (base) return base._onTimeout
+            return undefined
         }
 
         function isCalledByEvents(base) {
-            return base.constructor.prototype == EventEmmiter
+            if (base) return base.constructor.prototype == EventEmmiter
+            return undefined
         }
 
         function isCalledByInterval(base) {
-            return base._repeat
+            if (base) return base._repeat
+            return undefined
+        }
+
+        function isTestEntity(iid) {
+            return getFilePath(iid).includes(projectDirectoryTests)
         }
 
         function addToMapList(map, key, value) {
@@ -261,13 +258,28 @@ const trackExternals = false;
             }
         }
 
-        function addDependency(f, caller){
-            let fID = getID(f)
-            let callerID = getID(caller)
-            if(dependencies.indexOf(fID) == -1){
-                dependencies[fID] = []
+        function addDependency(f, caller) {
+            let i = f.iid
+            let j = caller.iid
+            if (!isTestEntity(i)) {
+                let fileKey = getEntityKey(f.name, getFileName(i), getLine(i), getEndLine(i))
+                if (!entitiesData[fileKey]) {
+                    entitiesData[fileKey] = { 'tests': [], 'callers': [], 'callees': [] }
+                }
+
+                let file2Key = getEntityKey(caller.name, getFileName(j), getLine(j), getEndLine(j))
+                if (isTestEntity(j)) {
+                    entitiesData[fileKey]['tests'].push(file2Key)
+                } else {
+                    entitiesData[fileKey]['callers'].push(file2Key)
+                    if (entitiesData[file2Key]) {
+                        entitiesData[file2Key]['callees'].push(fileKey)
+                    } else {
+                        entitiesData[file2Key]= { 'tests': [], 'callers': [], 'callees': [fileKey] }
+                    }
+
+                }
             }
-            dependencies[fID][callerID] = 1
         }
 
         function addToTimeoutMap(key, value) {
@@ -315,7 +327,25 @@ const trackExternals = false;
             return []
         }
 
-
+        function updateDependencies() {
+            let data = fs.readFileSync(path.join(projectDirectory, 'dependencies.json'), { encoding: 'utf8', flag: 'r' });
+            if (data) {
+                data = JSON.parse(data)
+                for ( let entity in entitiesData) {
+                    let value = entitiesData[entity]
+                    if (data[entity]) {
+                        data[entity]['tests'] = data[entity]['tests'].concat(value['tests'])
+                        data[entity]['callees'] = data[entity]['callees'].concat(value['callees'])
+                        data[entity]['callers'] = data[entity]['callers'].concat(value['callers'])
+                    } else {
+                        data[entity] = value
+                    }
+                }
+            }else{
+                data = entitiesData
+            }
+            fs.writeFileSync(path.join(projectDirectory, 'dependencies.json'), JSON.stringify(data))
+        }
     }
     sandbox.analysis = new Analyser();
 })(J$);

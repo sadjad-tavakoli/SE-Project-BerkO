@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const exec = require('child_process').exec;
+const nodeprofCommand = require('../settings').nodeprofCommand
 var assert = require('assert');
 
 // describe('Test callChain.js', () => runTest('callChain.js'));
@@ -18,12 +19,11 @@ describe('Test functionCall_4.js', () => runTest('functionCall_4.js'));
 // describe('Test timeoutSingleUnknownFunction.js', () => runTest('timeoutSingleUnknownFunction.js'));
 
 
-const nodeprofCommand = '$GRAAL_HOME/bin/node --jvm --experimental-options --vm.Dtruffle.class.path.append=$NODEPROF_HOME/nodeprof.jar --nodeprof $NODEPROF_HOME/jalangi.js --analysis analyser.js test/unit_tests/'
 
 function runTest(item) {
   it('Run nodeprof', function (done) {
     this.timeout(10000);
-    execute(nodeprofCommand + item, done)
+    execute(nodeprofCommand + "/test/unit_tests/" + item, done)
     // done()
   });
   it('Compare resutl', function (done) {
