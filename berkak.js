@@ -2,10 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const exec = require('child_process').exec;
 const nodeprofCommand = require('./utils').nodeprofCommand
-const projectDirectory = require('./utils').projectDirectory
+const dependeciesPath = require('./utils').dependeciesPath
 const projectDirectoryTests = require('./utils').projectDirectoryTests
 const getEntityKey = require('./utils').getEntityKey
 const getFileFromPath = require('./utils').getFileFromPath
+const getDependenciesData = require('./utils').getDependenciesData
+const getTestNameFromKey = require('./utils').getTestNameFromKey
+let dependenciesData = {}
+
 let repo = require('./utils').repo
 
 const refDiffPath = "/Users/sadjadtavakoli/University/lab/RefDiff"
@@ -14,7 +18,7 @@ const refDiffPath = "/Users/sadjadtavakoli/University/lab/RefDiff"
 const computeChangesCommands = "cd " + refDiffPath + " ; $JAVA_HOME/bin/java -XX:+ShowCodeDetailsInExceptionMessages -Dfile.encoding=UTF-8 @/var/folders/c6/w0q19v596ds_2tr377yp58zr0000gn/T/cp_buafb8c0insdm1u40g9jf15gm.argfile refdiff.berkak.RefDiffBerkak "
 
 function run() {
-  let commit = "5211f1d"
+  let commit = "70cd791 "
   let commitArg = process.argv[2]
   let repoArg = process.argv[3]
   if (commitArg != undefined) {
@@ -37,15 +41,18 @@ function run() {
   // 4- Run those detected tests 
   // 5- update dependecies table based on this execution result
 
-  let dependeciesPath = path.join(projectDirectory, 'dependencies.json')
-
   if (fs.existsSync(dependeciesPath)) {
     console.log('Directory found.');
-    let data = fs.readFileSync(dependeciesPath, { encoding: 'utf8', flag: 'r' })
-    if (data) {
-      // dependencies = JSON.parse();
-      console.log("run analysis based on changes")
-      runAnalysisBasedOnchanges(data)
+    dependenciesData = getDependenciesData()
+    if (Object.keys(dependenciesData).length) {
+      let previousCommit = dependenciesData['commitID']
+      if (previousCommit == commit) {
+        process.stdout.write(" Nothing to Update! ")
+      } else {
+        dependenciesData = dependenciesData['data']
+        console.log("run analysis based on changes")
+        runAnalysisBasedOnchanges(previousCommit)
+      }
     } else {
       console.log('Run analysis from scratch');
       runAnalysis()
@@ -57,36 +64,41 @@ function run() {
 
 
 
-  function runAnalysisBasedOnchanges(data) {
-    let dependecies = JSON.parse(data)
-    exec(computeChangesCommands + repo + " " + commit, (err, stdout, stderr) => {
+  function runAnalysisBasedOnchanges(previousCommit) {
+    exec(computeChangesCommands + repo + " " + commit + " " + previousCommit, (err, stdout, stderr) => {
       if (!err) {
+
         let updatedFiles = JSON.parse(stdout)
-        let changes  = updatedFiles['changes']
-        let selectedTests = []
-        for(let index in changes){
+        let changes = updatedFiles['changes']
+        for (let index in changes) {
           let item = changes[index]
           let entityKey = getEntityKey(item['name'], getFileFromPath(item['file']), item['begin'], item['end'])
-          selectedTests = selectedTests.concat(dependecies[entityKey]['tests'])
-          let callers = dependecies[entityKey]['callers']
-          for(let callerIndex in callers){
-            let caller = callers[callerIndex]
-            selectedTests = selectedTests.concat(dependecies[caller]['tests'])
+          let tests = dependenciesData[entityKey]['tests']
+            for (let testIndex in tests) {
+            let test = tests[testIndex]
+            let testName = getTestNameFromKey(test)
+            exec(nodeprofCommand + path.join(projectDirectoryTests, testName) + " " + entityKey + " " + commit, (err, stdout, stderr) => {
+              if (!err) {
+                process.stdout.write(stdout)
+              }
+              else {
+                process.stderr.write(stderr)
+              }
+            })
           }
         }
-        console.log(selectedTests) // now I have selected test -> what now?
+      } else {
+        process.stderr.write(stderr)
       }
     })
 
 
   }
 
-
   function runAnalysis() {
     let filenames = fs.readdirSync(projectDirectoryTests);
-    console.log("\nCurrent directory filenames:");
-    filenames.forEach(file => {
-      exec(nodeprofCommand + path.join(projectDirectoryTests, file), (err, stdout, stderr) => {
+    filenames.forEach(testName => {
+      exec(nodeprofCommand + path.join(projectDirectoryTests, testName) + " __NULL__ " + commit, (err, stdout, stderr) => {
         if (!err) {
           process.stdout.write(stdout)
         }

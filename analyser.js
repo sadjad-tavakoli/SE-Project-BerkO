@@ -2,7 +2,17 @@
 // JALANGI DO NOT INSTRUMENT
 const fs = require('fs');
 const events = require('events')
-const { projectDirectoryTests, projectDirectory, getEntityKey } = require('./utils');
+const {
+    getFileName,
+    getFilePath,
+    getLine,
+    getEndLine,
+    getPositionInLine,
+    isTestEntity,
+    getEntityKey,
+    projectDirectory,
+    getDependenciesData
+} = require('./utils');
 
 let logger = "";
 let mainFileName = "";
@@ -13,7 +23,9 @@ let EventEmmiter = events.EventEmitter.prototype;
 let addedListeners = new Map();
 let emittedEvents = new Map();
 let entitiesData = {};
-
+let entityKey = process.argv[process.argv.length - 2]
+let commit = process.argv[process.argv.length - 1]
+console.log(process.argv)
 const trackExternals = true;
 
 (function (sandbox) {
@@ -145,7 +157,8 @@ const trackExternals = true;
                 }
                 console.log("The file was saved!");
             });
-            updateDependencies()
+            mergeDependenciesAndNewData()
+            // console.log(getDependenciesData())
         };
 
         function getRelatedEvent(base, func) {
@@ -169,26 +182,6 @@ const trackExternals = true;
     }
 
     {
-        function getFileName(iid) {
-            let directories = getFilePath(iid).split('/')
-            return directories[directories.length - 1];
-        }
-
-        function getFilePath(iid) {
-            return J$.iidToLocation(iid).split(':')[0];
-        }
-
-        function getLine(iid) {
-            return J$.iidToLocation(iid).split(':')[1]
-        }
-
-        function getEndLine(iid) {
-            return J$.iidToLocation(iid).split(':')[3]
-        }
-
-        function getPositionInLine(iid) {
-            return J$.iidToLocation(iid).split(':')[2]
-        }
 
         function isMainFile(iid) {
             return (getLine(iid) == 1 && mainFileName == "") || accessedFiles.get(mainFileName) == iid
@@ -246,10 +239,6 @@ const trackExternals = true;
             return undefined
         }
 
-        function isTestEntity(iid) {
-            return getFilePath(iid).includes(projectDirectoryTests)
-        }
-
         function addToMapList(map, key, value) {
             if (map.has(key)) {
                 map.get(key).push(value)
@@ -273,13 +262,54 @@ const trackExternals = true;
                 } else {
                     entitiesData[fileKey]['callers'].push(file2Key)
                     if (entitiesData[file2Key]) {
-                        entitiesData[file2Key]['callees'].push(fileKey)
+                        entitiesData[file2Key]['callees'].push(fileKey) // Duplication 
                     } else {
-                        entitiesData[file2Key]= { 'tests': [], 'callers': [], 'callees': [fileKey] }
+                        entitiesData[file2Key] = { 'tests': [], 'callers': [], 'callees': [fileKey] }
                     }
 
                 }
             }
+        }
+
+        function mergeDependenciesAndNewData() {
+            let data = getDependenciesData()
+            if (Object.keys(data).length) {
+
+                data = data['data']
+
+                if (data[entityKey]) {
+                    let callers = data[entityKey]['callers']
+                    for (let index in callers) {
+                        let caller = callers[index]
+                        let entityIndex = data[caller]['callees'].indexOf(entityKey)
+                        data[caller]['callees'].splice(entityIndex, 1);
+                    }
+
+                    let callees = data[entityKey]['callees']
+                    for (let index in callees) {
+                        let callee = callees[index]
+                        let entityIndex = data[callee]['callers'].indexOf(entityKey)
+                        data[callee]['callers'].splice(entityIndex, 1);
+                    }
+
+                    delete data[entityKey];
+                }
+
+
+                for (let entity in entitiesData) {
+                    let value = entitiesData[entity]
+                    if (data[entity]) {
+                        data[entity]['tests'] = [...new Set([...data[entity]['tests'],...value['tests']])]
+                        data[entity]['callees'] = [...new Set([...data[entity]['callees'],...value['callees']])]
+                        data[entity]['callers'] = [...new Set([...data[entity]['callers'],...value['callers']])]
+                    } else {
+                        data[entity] = value
+                    }
+                }
+            } else {
+                data = entitiesData
+            }
+            fs.writeFileSync(path.join(projectDirectory, 'dependencies.json'), JSON.stringify({'commitID': commit, 'data': data}))
         }
 
         function addToTimeoutMap(key, value) {
@@ -325,26 +355,6 @@ const trackExternals = true;
                 return baseEvents.get(event)
             }
             return []
-        }
-
-        function updateDependencies() {
-            let data = fs.readFileSync(path.join(projectDirectory, 'dependencies.json'), { encoding: 'utf8', flag: 'r' });
-            if (data) {
-                data = JSON.parse(data)
-                for ( let entity in entitiesData) {
-                    let value = entitiesData[entity]
-                    if (data[entity]) {
-                        data[entity]['tests'] = data[entity]['tests'].concat(value['tests'])
-                        data[entity]['callees'] = data[entity]['callees'].concat(value['callees'])
-                        data[entity]['callers'] = data[entity]['callers'].concat(value['callers'])
-                    } else {
-                        data[entity] = value
-                    }
-                }
-            }else{
-                data = entitiesData
-            }
-            fs.writeFileSync(path.join(projectDirectory, 'dependencies.json'), JSON.stringify(data))
         }
     }
     sandbox.analysis = new Analyser();
