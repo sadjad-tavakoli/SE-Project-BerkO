@@ -19,7 +19,7 @@ operation involving them was applied. The following relationship types are suppo
 * Extract Method/Function
 * Inline Method/Function
 
-*This version of RefDiff can't find refactory and is changed to detect changed entities between two different version of project. 
+*This version of RefDiff can't find refactory and is changed to detect changed entities between two different versions of project. 
 
 ## Getting started
 
