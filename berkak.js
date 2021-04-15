@@ -12,7 +12,7 @@ let dependenciesData = {}
 
 let repo = require('./utils').repo
 
-const refDiffPath = "/Users/sadjadtavakoli/University/lab/RefDiff"
+const refDiffPath = __dirname + path.sep + "RefDiff-Berkak"
 
 // TODO RefDiff repo would be part of this directory
 const computeChangesCommands = "cd " + refDiffPath + " ; $JAVA_HOME/bin/java -XX:+ShowCodeDetailsInExceptionMessages -Dfile.encoding=UTF-8 @/var/folders/c6/w0q19v596ds_2tr377yp58zr0000gn/T/cp_buafb8c0insdm1u40g9jf15gm.argfile refdiff.berkak.RefDiffBerkak "
@@ -46,19 +46,18 @@ function run() {
     dependenciesData = getDependenciesData()
     if (Object.keys(dependenciesData).length) {
       let previousCommit = dependenciesData['commitID']
-      if (previousCommit == commit) {
-        process.stdout.write(" Nothing to Update! ")
+      if (previousCommit.trim() == commit.trim()) {
+        process.stdout.write("*****  Everything is up to date! *****")
       } else {
         dependenciesData = dependenciesData['data']
-        console.log("run analysis based on changes")
+        console.log("Run analysis based on previous detections")
         runAnalysisBasedOnchanges(previousCommit)
       }
     } else {
-      console.log('Run analysis from scratch');
       runAnalysis()
     }
   } else {
-    console.log('Directory not found.');
+    fs.writeFileSync( dependeciesPath, "")
     runAnalysis()
   }
 
@@ -67,7 +66,6 @@ function run() {
   function runAnalysisBasedOnchanges(previousCommit) {
     exec(computeChangesCommands + repo + " " + commit + " " + previousCommit, (err, stdout, stderr) => {
       if (!err) {
-
         let updatedFiles = JSON.parse(stdout)
         let changes = updatedFiles['changes']
         for (let index in changes) {
@@ -96,6 +94,7 @@ function run() {
   }
 
   function runAnalysis() {
+    console.log('Run analysis from scratch');
     let filenames = fs.readdirSync(projectDirectoryTests);
     filenames.forEach(testName => {
       exec(nodeprofCommand + path.join(projectDirectoryTests, testName) + " __NULL__ " + commit, (err, stdout, stderr) => {
@@ -114,9 +113,7 @@ function run() {
 
 
 console.log(" * * * * * * * * * * * ")
-console.log(" * * * * * * * * * * * ")
-console.log(" * * * hi there! * * * ")
-console.log(" * * * * * * * * * * * ")
+console.log(" * * * *  Srart! * * * ")
 console.log(" * * * * * * * * * * * ")
 
 run()

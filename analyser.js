@@ -10,7 +10,7 @@ const {
     getPositionInLine,
     isTestEntity,
     getEntityKey,
-    projectDirectory,
+    dependeciesPath,
     getDependenciesData
 } = require('./utils');
 
@@ -25,7 +25,6 @@ let emittedEvents = new Map();
 let entitiesData = {};
 let entityKey = process.argv[process.argv.length - 2]
 let commit = process.argv[process.argv.length - 1]
-console.log(process.argv)
 const trackExternals = true;
 
 (function (sandbox) {
@@ -158,7 +157,6 @@ const trackExternals = true;
                 console.log("The file was saved!");
             });
             mergeDependenciesAndNewData()
-            // console.log(getDependenciesData())
         };
 
         function getRelatedEvent(base, func) {
@@ -309,7 +307,7 @@ const trackExternals = true;
             } else {
                 data = entitiesData
             }
-            fs.writeFileSync(path.join(projectDirectory, 'dependencies.json'), JSON.stringify({'commitID': commit, 'data': data}))
+            fs.writeFileSync(dependeciesPath, JSON.stringify({'commitID': commit, 'data': data}))
         }
 
         function addToTimeoutMap(key, value) {
