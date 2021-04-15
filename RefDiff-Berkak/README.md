@@ -21,6 +21,10 @@ operation involving them was applied. The following relationship types are suppo
 
 *This version of RefDiff can't find refactory and is changed to detect changed entities between two different versions of project. 
 
+## This Version
+
+This version of RefDiff will report changed entities instead of refactorings. It uses a changed version of RefDiff Core module to detect changed entities based on textual similarity.
+
 ## Getting started
 
 Before building the project, make sure you have git and a Java Development Kit (JDK) version 8 installed in your system. Also, set the JAVA_HOME environment variable to point to the installation directory of the desired JDK.
