@@ -11,7 +11,7 @@ const {
     isTestEntity,
     getEntityKey,
     dependeciesPath,
-    getDependenciesData
+    getExistingDependenciesData
 } = require('./utils');
 
 let logger = "";
@@ -270,7 +270,7 @@ const trackExternals = true;
         }
 
         function mergeDependenciesAndNewData() {
-            let data = getDependenciesData()
+            let data = getExistingDependenciesData()
             if (Object.keys(data).length) {
 
                 data = data['data']

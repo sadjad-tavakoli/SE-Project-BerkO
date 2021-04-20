@@ -6,7 +6,7 @@ const dependeciesPath = require('./utils').dependeciesPath
 const projectDirectoryTests = require('./utils').projectDirectoryTests
 const getEntityKey = require('./utils').getEntityKey
 const getFileFromPath = require('./utils').getFileFromPath
-const getDependenciesData = require('./utils').getDependenciesData
+const getExistingDependenciesData = require('./utils').getExistingDependenciesData
 const getTestNameFromKey = require('./utils').getTestNameFromKey
 let dependenciesData = {}
 
@@ -29,21 +29,9 @@ function run() {
     repo = repoArg
   }
 
-  // 1- get parent commit
-  // 2- find out how to access a commits files (probably using Refdiff codes)
-  // 3- check whether there is a dependency file in that version of code 
-  // if YES: 
-  // get related tests to our detected changes
-  // if NO:
-  // run tests on that version of project 
-  // store dependencies
-  // get related tests to our detected changes
-  // 4- Run those detected tests 
-  // 5- update dependecies table based on this execution result
-
   if (fs.existsSync(dependeciesPath)) {
     console.log('Directory found.');
-    dependenciesData = getDependenciesData()
+    dependenciesData = getExistingDependenciesData()
     if (Object.keys(dependenciesData).length) {
       let previousCommit = dependenciesData['commitID']
       if (previousCommit.trim() == commit.trim()) {
@@ -52,7 +40,7 @@ function run() {
         dependenciesData = dependenciesData['data']
         console.log("Run analysis based on previous detections")
         runAnalysisBasedOnchanges(previousCommit)
-      }
+      }x
     } else {
       runAnalysis()
     }
@@ -60,8 +48,6 @@ function run() {
     fs.writeFileSync( dependeciesPath, "")
     runAnalysis()
   }
-
-
 
   function runAnalysisBasedOnchanges(previousCommit) {
     exec(computeChangesCommands + repo + " " + commit + " " + previousCommit, (err, stdout, stderr) => {
@@ -89,8 +75,6 @@ function run() {
         process.stderr.write(stderr)
       }
     })
-
-
   }
 
   function runAnalysis() {
@@ -110,7 +94,6 @@ function run() {
 
   }
 }
-
 
 console.log(" * * * * * * * * * * * ")
 console.log(" * * * *  Srart! * * * ")

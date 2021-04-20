@@ -7,7 +7,7 @@ const projectDirectoryTests = "/Users/sadjadtavakoli/University/lab/temp_sample/
 const repo = "https://github.com/sadjad-tavakoli/temp_sample.git"
 const dependeciesPath = path.join(projectDirectory, 'dependencies.json')
 
-function getDependenciesData() {
+function getExistingDependenciesData() {
     let dependenciesData = {}
     let data = fs.readFileSync(dependeciesPath, { encoding: 'utf8', flag: 'r' });
     if (data) {
@@ -68,7 +68,7 @@ module.exports = {
     getLine,
     getEndLine,
     getPositionInLine,
-    getDependenciesData,
+    getExistingDependenciesData,
     getTestNameFromKey,
 
 
