@@ -1,6 +1,8 @@
 # BerkO
 BerkO is a function-level dynamic analysis tool that captures functions dependency using test selection. To run BerkO, you should enable NodeProf and RefDiff as the main components of BerkO. 
 
+------------------------------------------------------------
+
 # NodeProf 
 (https://github.com/Haiyang-Sun/nodeprof.js.git)
 [![Build Status](https://api.travis-ci.com/Haiyang-Sun/nodeprof.js.svg?branch=master)](https://travis-ci.com/Haiyang-Sun/nodeprof.js)
@@ -64,10 +66,7 @@ NodeProf is available under the following license:
 
 * [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
-## Acknowledgement
-
-Thanks to Daniele Bonetta, Alexander Jordan, and Christian Humer from Oracle Labs for the help during the implementation.
-
+------------------------------------------------------------
 # RefDiff 
 (https://github.com/sadjad-tavakoli/RefDiff.git)
 RefDiff originally is a tool to mine refactorings in the commit history of git repositories. This version of RefDiff can't find refactors and is changed to detect changed entities between two revisions.
@@ -85,6 +84,7 @@ gradlew eclipse
 
 Note that in Linux or Mac you should run `./gradlew eclipse` to run the gradle wrapper.
 
+------------------------------------------------------------
 # BerkO
 
 ```
