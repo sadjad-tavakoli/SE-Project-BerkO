@@ -321,7 +321,7 @@ public class CstComparator {
 				if(score < 1){
 					after.removeFromParents(n2);
 					before.removeFromParents(n1);
-					this.changed.add(n1);
+					this.changed.add(n2);
 				}
 			}
 		}

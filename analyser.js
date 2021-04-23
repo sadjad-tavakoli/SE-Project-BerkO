@@ -11,6 +11,7 @@ const {
     isTestEntity,
     getEntityKey,
     dependeciesPath,
+    addToMapList,
     getExistingDependenciesData
 } = require('./utils');
 
@@ -21,9 +22,10 @@ let timeoutsQueueMap = new Map();
 let accessedFiles = new Map();
 let EventEmmiter = events.EventEmitter.prototype;
 let addedListeners = new Map();
+let listenerAdders = new Map();
 let emittedEvents = new Map();
 let entitiesData = {};
-let entityKey = process.argv[process.argv.length - 2]
+let entityKeys = process.argv[process.argv.length - 2]
 let commit = process.argv[process.argv.length - 1]
 const trackExternals = true;
 
@@ -43,11 +45,14 @@ const trackExternals = true;
                 log(lineNumber + " class " + fName + "'s constructor is called with variables " + 'args' + " by " + functionEnterStack[functionEnterStack.length - 1].name)
 
             } else if (isAddEventlistener(f)) {
+                let adderFunction = functionEnterStack[functionEnterStack.length - 1]
                 addToAddedListener(base, args[0], args[1])
+                addToAdders(base, args[0], adderFunction)
 
             } else if (isEmitEvent(f)) {
                 let callerFunction = functionEnterStack[functionEnterStack.length - 1]
                 addToEmittedEvents(base, { 'event': args[0], 'listeners': getAddedListeners(base, args[0]).slice(), 'callerFunction': callerFunction })
+                addEventsDependency(base, args[0], callerFunction)
                 log(lineNumber + " function " + callerFunction.name + " emitted event " + args[0] + " of " + base.constructor.name)
             } else {
                 if (isTimeOut(f)) {
@@ -150,6 +155,15 @@ const trackExternals = true;
 
         this.endExecution = function () {
             log("end Execution");
+            if (!fs.existsSync('./test/analyzerOutputs')) {
+                fs.mkdir("./test/analyzerOutputs", function (err) {
+                    if (err) {
+                        console.log(err)
+                    } else {
+                        console.log("New directory successfully created.")
+                    }
+                })
+            }
             fs.writeFileSync(path.join(__dirname, 'test/analyzerOutputs' + path.sep + mainFileName), logger, function (err) {
                 if (err) {
                     return console.log(err);
@@ -237,14 +251,6 @@ const trackExternals = true;
             return undefined
         }
 
-        function addToMapList(map, key, value) {
-            if (map.has(key)) {
-                map.get(key).push(value)
-            } else {
-                map.set(key, [value])
-            }
-        }
-
         function addDependency(f, caller) {
             let i = f.iid
             let j = caller.iid
@@ -269,37 +275,77 @@ const trackExternals = true;
             }
         }
 
+        function addEventsDependency(base, event, f) {
+            let adders = getAdders(base, event)
+            for (let index in adders) {
+                let adder = adders[index]
+                let i = f.iid
+                let j = adder.iid
+                if (!isTestEntity(i)) {
+                    let fileKey = getEntityKey(f.name, getFileName(i), getLine(i), getEndLine(i))
+                    if (!entitiesData[fileKey]) {
+                        entitiesData[fileKey] = { 'tests': [], 'callers': [], 'callees': [], 'emitters': [] }
+                    } else if (!entitiesData[fileKey]['emitters']) {
+                        entitiesData[fileKey]['emitters'] = []
+                    }
+
+                    let file2Key = getEntityKey(adder.name, getFileName(j), getLine(j), getEndLine(j))
+                    if (isTestEntity(j)) {
+                        entitiesData[fileKey]['tests'].push(file2Key)
+                    } else {
+                        if (entitiesData[fileKey]['emitters'].indexOf(file2Key) === -1) {
+                            entitiesData[fileKey]['emitters'].push(file2Key)
+                        }
+                    }
+                }
+            }
+        }
         function mergeDependenciesAndNewData() {
             let data = getExistingDependenciesData()
             if (Object.keys(data).length) {
-
                 data = data['data']
+                console.log(entityKeys)
+                let entityKeysList = entityKeys.slice(1, -1).split(',')
+                for (let entityKeyIndex in entityKeysList) {
+                    let entityKey = entityKeysList[entityKeyIndex]
+                    if (data[entityKey]) {
+                        let callers = data[entityKey]['callers']
+                        for (let index in callers) {
+                            let caller = callers[index]
+                            let entityIndex = data[caller]['callees'].indexOf(entityKey)
+                            data[caller]['callees'].splice(entityIndex, 1);
+                        }
 
-                if (data[entityKey]) {
-                    let callers = data[entityKey]['callers']
-                    for (let index in callers) {
-                        let caller = callers[index]
-                        let entityIndex = data[caller]['callees'].indexOf(entityKey)
-                        data[caller]['callees'].splice(entityIndex, 1);
+                        let callees = data[entityKey]['callees']
+                        for (let index in callees) {
+                            let callee = callees[index]
+                            let entityIndex = data[callee]['callers'].indexOf(entityKey)
+                            data[callee]['callers'].splice(entityIndex, 1);
+                        }
+                        // should also check emitters
+                        delete data[entityKey];
                     }
-
-                    let callees = data[entityKey]['callees']
-                    for (let index in callees) {
-                        let callee = callees[index]
-                        let entityIndex = data[callee]['callers'].indexOf(entityKey)
-                        data[callee]['callers'].splice(entityIndex, 1);
-                    }
-
-                    delete data[entityKey];
                 }
-
 
                 for (let entity in entitiesData) {
                     let value = entitiesData[entity]
+
                     if (data[entity]) {
-                        data[entity]['tests'] = [...new Set([...data[entity]['tests'],...value['tests']])]
-                        data[entity]['callees'] = [...new Set([...data[entity]['callees'],...value['callees']])]
-                        data[entity]['callers'] = [...new Set([...data[entity]['callers'],...value['callers']])]
+                        data[entity]['tests'] = [...new Set([...data[entity]['tests'], ...value['tests']])]
+                        data[entity]['callees'] = [...new Set([...data[entity]['callees'], ...value['callees']])]
+                        data[entity]['callers'] = [...new Set([...data[entity]['callers'], ...value['callers']])]
+
+                        if (!value['emitters']) {
+                            if (data[entity]['emitters']) {
+                                delete data[entity]['emitters']
+                            }
+                        } else {
+                            if (data[entity]['emitters']) {
+                                data[entity]['emitters'] = [...new Set([...data[entity]['emitters'], ...value['emitters']])]
+                            } else {
+                                data[entity]['emitters'] = value['emitters']
+                            }
+                        }
                     } else {
                         data[entity] = value
                     }
@@ -327,6 +373,15 @@ const trackExternals = true;
             }
         }
 
+        function addToAdders(base, event, adderFunction) {
+            let baseEvents = listenerAdders.get(base)
+            if (!baseEvents) {
+                listenerAdders.set(base, new Map().set(event, [adderFunction]))
+            } else {
+                addToMapList(baseEvents, event, adderFunction)
+            }
+        }
+
         function popFromTimeoutMap(key) {
             if (timeoutsQueueMap.has(key)) {
                 return timeoutsQueueMap.get(key).shift()
@@ -349,6 +404,14 @@ const trackExternals = true;
 
         function getAddedListeners(base, event) {
             let baseEvents = addedListeners.get(base)
+            if (baseEvents && baseEvents.has(event)) {
+                return baseEvents.get(event)
+            }
+            return []
+        }
+
+        function getAdders(base, event) {
+            let baseEvents = listenerAdders.get(base)
             if (baseEvents && baseEvents.has(event)) {
                 return baseEvents.get(event)
             }

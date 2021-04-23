@@ -4,6 +4,7 @@ const fs = require('fs');
 const nodeprofCommand = '$GRAAL_HOME/bin/node --jvm --experimental-options --vm.Dtruffle.class.path.append=$NODEPROF_HOME/nodeprof.jar --nodeprof $NODEPROF_HOME/jalangi.js --analysis analyser.js '
 const projectDirectory = "/Users/sadjadtavakoli/University/lab/temp_sample/simpleProjectTest"
 const projectDirectoryTests = "/Users/sadjadtavakoli/University/lab/temp_sample/simpleProjectTest/tests"
+const testsNamingFormat = "tests/"
 const repo = "https://github.com/sadjad-tavakoli/temp_sample.git"
 const dependeciesPath = path.join(projectDirectory, 'dependencies.json')
 
@@ -33,6 +34,10 @@ function isTestEntity(iid) {
     return getFilePath(iid).includes(projectDirectoryTests)
 }
 
+function matchTestNaming(name) {
+    return name.includes(testsNamingFormat)
+}
+
 function getFileName(iid) {
     let directories = getFilePath(iid).split('/')
     return directories[directories.length - 1];
@@ -54,12 +59,21 @@ function getPositionInLine(iid) {
     return J$.iidToLocation(iid).split(':')[2]
 }
 
+function addToMapList(map, key, value) {
+    if (map.has(key)) {
+        map.get(key).push(value)
+    } else {
+        map.set(key, [value])
+    }
+}
+
 module.exports = {
     nodeprofCommand,
     projectDirectory,
     projectDirectoryTests,
     repo,
     dependeciesPath,
+    matchTestNaming,
     getEntityKey,
     getFileFromPath,
     isTestEntity,
@@ -70,6 +84,7 @@ module.exports = {
     getPositionInLine,
     getExistingDependenciesData,
     getTestNameFromKey,
+    addToMapList,
 
 
 }
