@@ -87,9 +87,9 @@ Note that in Linux or Mac you should run `./gradlew eclipse` to run the gradle w
 ------------------------------------------------------------
 # BerkO
 
+After installing NodeProf and RefDiff, you should specify your project's main directory and test directory in BerkO/utils.js. Then run the following command:
 ```
-node berkak.js [repository] [commit_id] 
+node berkak.js [commit_id] [projec_repository] 
 ```
-
-
+You can also set project_repository in BerkO/utils.js as well, instead of passing it as a argument. 
 
