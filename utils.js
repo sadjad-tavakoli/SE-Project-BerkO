@@ -17,7 +17,7 @@ function getExistingDependenciesData() {
     return dependenciesData
 }
 
-function getEntityKey(entityName, fileName, startLine, endLine) { // it's not an appropriate way to generate keys => what about same name functions with identical lenghts?
+function getEntityKey(entityName, fileName, startLine, endLine) { // it's not an appropriate way to generate keys
     return entityName.charAt(0).toLowerCase() + entityName.substring(1) + "--" + fileName.charAt(0).toLowerCase() + fileName.substring(1) + "--" +  (endLine - startLine)
 }
 
@@ -86,5 +86,8 @@ module.exports = {
     getTestNameFromKey,
     addToMapList,
 
+
+
+    // comment to test algorithm (can remove this whenever you want)
 
 }
