@@ -91,6 +91,20 @@ function run() {
     })
   }
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   function runAnalysis() {
     console.log('Run analysis from scratch');
     let filenames = fs.readdirSync(projectDirectoryTests);
